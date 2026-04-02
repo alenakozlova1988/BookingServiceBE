@@ -1,0 +1,321 @@
+version: '3.8'
+
+services:
+  # Keycloak
+  
+  # --- PostgreSQL для Keycloak ---
+  keycloak_db:
+    image: postgres:15 # Или другая версия PostgreSQL, совместимая с вашей версией Keycloak
+    container_name: keycloak_postgres_db
+    environment:
+      # Важно: используйте надежные пароли для продакшена!
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: strong_keycloak_password
+      PGDATA: /var/lib/postgresql/data/pgdata # Указывает, где хранить данные внутри контейнера
+    volumes:
+      # Именованный том для надежного хранения данных PostgreSQL Keycloak
+      - keycloak_postgres_volume:/var/lib/postgresql/data
+      # Вы можете добавить скрипты инициализации, если нужно
+      # - ./keycloak-init/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - keycloak_network # Отдельная сеть для Keycloak и его БД
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ] # Команда для проверки готовности Postgres
+      interval: 10s # Как часто проверять
+      timeout: 5s   # Время ожидания ответа от команды
+      retries: 5    # Сколько раз пробовать, прежде чем считать сервис 'нездоровым'
+  
+  # --- Keycloak ---
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4 # Используйте актуальную версию Keycloak
+    container_name: keycloak
+    environment:
+      # Основные настройки Keycloak
+      KEYCLOAK_ADMIN: admin       # Имя администратора Keycloak
+      KEYCLOAK_ADMIN_PASSWORD: admin_password # Пароль администратора Keycloak (используйте надежный!)
+      
+      # Настройки базы данных
+      KC_DB: postgres
+      KC_DB_URL_HOST: keycloak_db # Имя сервиса PostgreSQL в docker-compose
+      KC_DB_URL_DATABASE: keycloak # Имя базы данных, указанное в настройках keycloak_db
+      KC_DB_USERNAME: keycloak # Имя пользователя БД, указанное в настройках keycloak_db
+      KC_DB_PASSWORD: strong_keycloak_password # Пароль пользователя БД
+      
+      # Настройки режима запуска (production или standalone)
+      # Для продакшена используйте " producción"
+      # Для разработки и тестирования можно использовать "standalone"
+      KC_LOG_LEVEL: "DEBUG" # Уровень логирования
+      
+      # Прочие настройки (можно настроить по необходимости)
+      # KC_HOSTNAME: keycloak.example.com # Если хотите использовать доменное имя
+      # KC_PROXY: edge # Если Keycloak работает за прокси
+      # KC_HTTP_ENABLED: "true" # Если Keycloak будет слушать HTTP (обычно в продакшене используют HTTPS)
+    
+    ports:
+      # Порт 8080 для HTTP соединений Keycloak
+      - "8080:8080"
+      # Если вы используете HTTPS
+      # - "8443:8443"
+    depends_on:
+      keycloak_db:
+        condition: service_healthy # Keycloak должен запуститься после того, как БД будет готова
+    networks:
+      - keycloak_network # Убеждаемся, что Keycloak в той же сети, что и его БД
+      - app_network # Добавляем в сеть вашего .NET-приложения, чтобы оно могло обращаться к Keycloak
+  
+  
+  kratos-pg:
+    image: postgres:16.1-alpine
+    volumes:
+      - type: volume
+        source: kratos-pg
+        target: /var/lib/postgresql/data
+        read_only: false
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=kratos
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_DB=kratos
+    networks:
+      - intranet
+  kratos-migrate:
+    depends_on:
+      - kratos-pg
+    image: oryd/kratos:1.0.0
+    env_file:
+      - .env
+    environment:
+      - DSN=postgres://kratos:secret@kratos-pg:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+    volumes:
+      - type: volume
+        source: kratos-pg
+        target: /var/lib/postgresql/data
+        read_only: false
+      - type: bind
+        source: ./kratos.yml # путь до кратос конфига
+        target: /etc/config/kratos/kratos.yml
+    command: -c /etc/config/kratos/kratos.yml migrate sql -e --yes
+    restart: on-failure
+    networks:
+      - intranet
+  kratos:
+    depends_on:
+      - kratos-migrate
+    image: oryd/kratos:1.0.0
+    ports:
+      - '4433:4433' # порт для публичного API
+      - '4434:4434' # порт для админ API
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DSN=postgres://kratos:secret@kratos-pg:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+    command: serve -c /etc/config/kratos/kratos.yml --dev --watch-courier
+    volumes:
+      - type: volume
+        source: kratos-pg
+        target: /var/lib/postgresql/data
+        read_only: false
+      - type: bind
+        source: ./kratos.yml
+        target: /etc/config/kratos/kratos.yml
+      - type: bind
+        source: ./schemas/ # путь до identity схем
+        target: /etc/config/kratos/schemas/
+      - type: bind
+        source: ./oidc
+        target: /etc/oidc
+    networks:
+      - intranet
+  kratos-selfservice-ui-node: # демо приложение, реализующее все flow
+    image: oryd/kratos-selfservice-ui-node:1.0.0
+    ports:
+      - "4455:4455"
+    env_file:
+      - .env
+    environment:
+      - PORT=4455
+      - SECURITY_MODE=
+    networks:
+      - intranet
+    restart: on-failure
+  mailslurper: # smtp сервер для разработки
+    image: oryd/mailslurper:latest-smtps
+    ports:
+      - '4436:4436'
+      - '4437:4437'
+    networks:
+      - intranet
+    
+# --- Kafka ---  
+    # --- Kafka ---
+  zookeeper:
+      image: confluentinc/cp-zookeeper:7.6.0
+      container_name: zookeeper
+      environment: # ЕДИНСТВЕННЫЙ блок environment для zookeeper
+        ZOOKEEPER_CLIENT_PORT: 2181
+        ZOOKEEPER_TICK_TIME: 2000
+        
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka
+    ports:
+      - "9092:9092"    # Для внешних подключений (например, из вашего .NET приложения вне Docker)
+      - "8081:8081"    # Для Kafka REST Proxy
+    environment:
+      # Подключение к Zookeeper
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Настройки слушателей (listeners)
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      # Адреса, который Kafka будет объявлять клиентам
+      # Для внешних подключений (вне Docker):
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:9091
+      # Внутренние слушатели (для коммуникации между брокерами, если их будет несколько)
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:9091
+      # ID брокера (нужен для кластера из одного брокера)
+      KAFKA_BROKER_ID: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1 # Для одного брокера
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1 # Для одного брокера
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1 # Для одного брокера
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true" # Удобно для разработки
+      # Настройки Kafka REST Proxy
+      KAFKA_REST_HOST_NAME: kafka
+      KAFKA_REST_PORT: 8081
+      KAFKA_REST_ZOOKEEPER_CONNECT: zookeeper:2181
+    depends_on:
+      - zookeeper
+
+  # Redis (для кеширования сессий Auth Service)
+  redis:
+    image: redis:7.2 # Используйте актуальную версию
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+  # База данных для Booking Service
+  booking-db:
+    image: postgres:15 # Используйте актуальную версию
+    container_name: booking-db
+    environment:
+      POSTGRES_DB: booking_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+    # Пробрасываем порт 5432 контейнера на порт 5432 вашей машины
+    # Это позволит вашему .NET-приложению подключаться к базе данных.
+    - "5433:5432"
+    depends_on:
+      - keycloak
+      - redis
+      - kafka
+  
+  auth-service:
+    build: ./auth-service # Путь к директории с Dockerfile сервиса
+    container_name: auth-service
+    ports:
+    - "5000:5000"
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: your-realm-name # Укажите ваш Realm в Keycloak
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      - keycloak
+      - redis
+      - kafka
+
+  # Booking Service Backend
+  booking-backend:
+    build: ./booking-backend # Путь к директории с Dockerfile сервиса
+    container_name: booking-backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://booking_user:booking_password@booking-db:5432/booking_db
+      AUTH_SERVICE_URL: http://auth-service:5000
+      KAFKA_BROKER_URL: kafka:9092
+    depends_on:
+      - booking-db
+      - auth-service
+      - kafka
+
+  # Booking Service Frontend
+  booking-frontend:
+    build: ./booking-frontend # Путь к директории с Dockerfile сервиса
+    container_name: booking-frontend
+    ports:
+      - "3000:3000" # Или порт, на котором работает ваш фронтенд
+    environment:
+      REACT_APP_AUTH_URL: http://localhost:8080 # URL Keycloak для аутентификации
+      REACT_APP_API_URL: http://localhost:8000 # URL Booking Backend
+      KEYCLOAK_CLIENT_ID: your-client-id # Укажите ваш Client ID в Keycloak
+
+  # Notification Service
+  notification-service:
+    build: ./notification-service # Путь к директории с Dockerfile сервиса
+    container_name: notification-service
+    environment:
+      KAFKA_BROKER_URL: kafka:9092
+      EMAIL_HOST: smtp.example.com
+      EMAIL_PORT: 587
+      EMAIL_USER: notification@example.com
+      EMAIL_PASSWORD: your_email_password
+      TELEGRAM_BOT_TOKEN: your_telegram_bot_token
+      AUTH_SERVICE_URL: http://auth-service:5000 # Возможно, потребуется для получения почты/телеграм ID
+    depends_on:
+      - kafka
+      - auth-service # Если требуется для получения данных пользователя
+      
+  elasticsearch:
+    image: elasticsearch:8.12.2
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - elk_network
+      
+  logstash:
+    image: logstash:8.12.2
+    container_name: logstash
+    volumes:
+      - ./logstash/config/logstash.conf:/usr/share/logstash/config/logstash.conf # Путь к вашей конфигурации Logstash
+    ports:
+      - "5000:5000"
+      - "4560:4560"
+      - "9600:9600"
+    depends_on:
+      - elasticsearch
+    networks:
+      - elk_network
+
+  # --- Kibana ---
+  kibana:
+    image: kibana:8.12.2
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - elk_network
+
+### Пример `Dockerfile` для Python сервиса (Booking Backend):
+networks:
+  elk_network: # Сеть для ELK Stack
+    driver: bridge
+  keycloak_network: # Сеть для Keycloak и его PostgreSQL
+    driver: bridge
+  app_network: # Сеть для вашего .NET-приложения и Keycloak (чтобы .NET мог обращаться к Keycloak)
+    driver: bridge
+  intranet:
+volumes:
+  keycloak_postgres_volume: # Именованный том для данных PostgreSQL Keycloak
+    driver: local # Можно явно указать driver, но local - это стандартное значение

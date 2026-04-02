@@ -1,0 +1,46 @@
+{
+  "type": "object",
+  "properties": {
+    "traits": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "title": "Email Address",
+          "ory.sh": {
+            "login": {
+              "identifier": true
+            },
+            "registration": {
+              "identifier": true
+            }
+          }
+        },
+        "phone_number": {
+          "type": "string",
+          "title": "Phone Number",
+          "ory.sh": {
+            "registration": {
+              "identifier": true
+            }
+          }
+        },
+        "first_name": {
+          "type": "string",
+          "title": "First Name"
+        },
+        "last_name": {
+          "type": "string",
+          "title": "Last Name"
+        }
+      },
+      "required": [
+        "email"
+      ]
+    }
+  },
+  "required": [
+    "traits"
+  ]
+}
