@@ -1,4 +1,7 @@
+using BookingService.Application.Dto;
+using BookingService.Application.Services;
 using BookingService.Domain.Entities;
+using BookingService.Domain.Interfaces;
 using BookingService.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,11 +16,13 @@ namespace MeetingRoomBooking.Controllers
     public class RoomsController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IMeetingRoomService _meetingRoomService;
 
         // Внедрение контекста базы данных через конструктор
-        public RoomsController(AppDbContext context)
+        public RoomsController(AppDbContext context, IMeetingRoomService meetingRoomService)
         {
             _context = context;
+            _meetingRoomService = meetingRoomService;
         }
 
         /// <summary>
@@ -25,14 +30,12 @@ namespace MeetingRoomBooking.Controllers
         /// GET: api/rooms
         /// </summary>
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<MeetingRoom>>> GetRooms()
+        public async Task<ActionResult<IEnumerable<MeetingRoomDto>>> GetRooms()
         {
             try
             {
                 // Получаем все комнаты из базы данных асинхронно
-                var rooms = await _context.MeetingRooms
-                    .AsNoTracking() // Оптимизация для запросов "только чтение"
-                    .ToListAsync();
+                var rooms = await _meetingRoomService.GetAllMeetingRoomsAsync();
 
                 return Ok(rooms); // Возвращаем статус 200 OK и список данных
             }

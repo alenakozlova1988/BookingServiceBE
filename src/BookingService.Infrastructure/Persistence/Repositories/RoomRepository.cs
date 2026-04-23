@@ -17,9 +17,9 @@ public class RoomRepository : IRoomRepository
         return await _context.MeetingRooms.FirstOrDefaultAsync(x =>x.Id == id);
     }
 
-    public Task<IEnumerable<MeetingRoom>> GetAllAsync()
+    public async Task<IEnumerable<MeetingRoom>> GetAllAsync()
     {
-        throw new NotImplementedException();
+        return await _context.MeetingRooms.ToListAsync();
     }
 
     public Task<IEnumerable<MeetingRoom>> GetByUserIdAsync(Guid userId)

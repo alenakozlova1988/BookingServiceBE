@@ -36,28 +36,31 @@ namespace BookingService.Application.Services
         {
             // 1. Validate input (handled by API layer mostly, but can add business logic validation here)
             // 2. Fetch Room Details (Check availability if not handled by Room Service)
-            var roomDetails = await _roomManagementService.GetRoomDetailsAsync(bookingDto.MeetingRoomId);
-            if (roomDetails == null) // Or specific exception for not found
-            {
-                throw new KeyNotFoundException($"Room with ID {bookingDto.MeetingRoomId} not found.");
-            }
+          //  var roomDetails = await _roomManagementService.
+      //      if (roomDetails == null) // Or specific exception for not found
+        //    {
+       //         throw new KeyNotFoundException($"Room with ID {bookingDto.MeetingRoomId} not found.");
+        //    }
+
+        var room = await _roomManagementService.GetRoomDetailsAsync(Guid.Parse(bookingDto.RoomId))
+                   ?? throw new Exception("Room not found");
             
             // 4. Create Booking Entity
             var booking = new Booking
             {
                 Id = Guid.NewGuid(),
-                MeetingRoomId = bookingDto.MeetingRoomId,
-                UserId = bookingDto.UserId, // Assume UserId comes from auth token or DTO
-                CheckInDate = bookingDto.CheckInDate,
-                CheckOutDate = bookingDto.CheckOutDate,
-                Status = BookingStatus.Pending // Initial status
+              //  MeetingRoomId = bookingDto.MeetingRoomId,
+               // UserId = bookingDto.UserId, // Assume UserId comes from auth token or DTO
+                CheckInDate = bookingDto.Date.UtcDateTime,//bookingDto.CheckInDate,
+                CheckOutDate = bookingDto.Date.UtcDateTime,
+                Status = BookingStatus.Pending,
+                MeetingRoomId = Guid.Parse(bookingDto.RoomId),
+                UserId = Guid.Parse("86cec37f-1f4d-476c-aa63-cb94e02f0b1e")// Initial status
             };
-
-            // 5. Save Booking to DB
-            await _bookingRepository.AddAsync(booking);
             try
             {
-                await _bookingRepository.SaveChangesAsync(); // Save changes before payment/messaging
+                // 5. Save Booking to DB
+                await _bookingRepository.AddAsync(booking); // Save changes before payment/messaging
             }
             catch (Exception ex)
             {

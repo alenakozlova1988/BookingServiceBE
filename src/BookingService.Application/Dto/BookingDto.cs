@@ -7,10 +7,10 @@ namespace BookingService.Application.Dto
         public Guid Id { get; set; } // Unique identifier for the booking
         public int DayIndex  { get; set; }
         public int StartHourIndex { get; set; }
-
+        public DateTime Date { get; set; }
         public double Duration { get; set; }
         public string Title { get; set; }
-        public string Room { get; set; }
+        public string RoomDescription { get; set; }
         public ColorTheme Color { get; set; }
 
         //public Guid RoomId { get; set; }
@@ -25,6 +25,6 @@ namespace BookingService.Application.Dto
     public enum ColorTheme
     {
         Teal,
-        Purple
+        Purple,
     }
 }

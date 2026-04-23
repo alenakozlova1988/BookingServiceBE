@@ -5,11 +5,15 @@ using BookingService.Infrastructure.Integrations.RoomMgmt;
 //using BookingService.Infrastructure.Messaging;
 using Microsoft.EntityFrameworkCore;
 using AutoMapper;
+using BookingService.Application.Common.Interfaces;
+using BookingService.Application.Interfaces;
 using BookingService.Application.Mapping;
 using BookingService.Domain;
 using BookingService.Infrastructure;
+using BookingService.Infrastructure.Middlewares;
 using BookingService.Infrastructure.Persistence;
 using BookingService.Infrastructure.Persistence.Repositories;
+using BookingService.Infrastructure.Services;
 //using Serilog;
 using Microsoft.Extensions.Options; // For IOptions<T>
 
@@ -25,6 +29,22 @@ var configuration = builder.Configuration;
     //             .WriteTo.Console()); // Log to console
 
 // --- Services ---
+
+// 1. Определяем имя политики
+    var myAllowSpecificOrigins = "_myAllowSpecificOrigins";
+
+// 2. Добавляем сервис CORS в контейнер
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy(name: myAllowSpecificOrigins,
+            policy =>
+            {
+                policy.WithOrigins("http://localhost:4200") // URL вашего Angular/Frontend приложения
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
+            });
+    });
+
 
 // Add controllers
 builder.Services.AddControllers();
@@ -44,6 +64,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Infrastructure: Repositories
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 builder.Services.AddScoped<IRoomRepository, RoomRepository>();
+builder.Services.AddScoped<IMeetingRoomService, MeetingRoomService>();
+
+
+
 // Add IUnitOfWork if you have implemented it
 // builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
@@ -57,10 +81,13 @@ builder.Services.AddScoped<IRoomRepository, RoomRepository>();
 // Infrastructure: Messaging (Example: Mock)
 // Replace with actual implementation (e.g., RabbitMQ client)
 //builder.Services.AddSingleton<IMessagePublisher, MockMessagePublisher>();
-
+builder.Services.AddHttpClient();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IKratosService, KratosService>();
 // Application Layer Services
 builder.Services.AddScoped<IBookingService, BookingService.Application.Services.BookingService>();
 builder.Services.AddScoped<IRoomManagementService, RoomManagementService>();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 // AutoMapper Configuration
 builder.Services.AddAutoMapper(typeof(MappingConfiguration)); // Assuming your profile is named MappingConfiguration in Application layer
@@ -73,14 +100,13 @@ builder.Services.AddAutoMapper(typeof(MappingConfiguration).Assembly);
 var app = builder.Build();
 
 // --- Middleware Pipeline ---
-
+app.UseMiddleware<KratosSessionMiddleware>();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
     app.UseSwagger();
     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Booking Service API v1"));
-
     // Seed database or run migrations automatically in development (Use with caution in prod)
     using (var scope = app.Services.CreateScope())
     {
@@ -103,6 +129,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// 3. Подключаем CORS в конвейер обработки запросов. 
+// Важно: UseCors должен стоять ПЕРЕД UseAuthorization и ПЕРЕД MapControllers
+app.UseCors(myAllowSpecificOrigins);
 // Use Serilog Request Logging
 //app.UseSerilogRequestLogging();
 

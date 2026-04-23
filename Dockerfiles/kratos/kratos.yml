@@ -1,0 +1,89 @@
+version: v1.1.0
+
+dsn: "postgres://kratos:secret@kratos-pg:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4"
+
+serve:
+  public:
+    base_url: "http://localhost:4433/"
+    port: 4433
+    cors:
+      enabled: true
+      allowed_origins:
+        - http://localhost:4200
+      allowed_methods:
+        - POST
+        - GET
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      allowed_headers:
+        - Authorization
+        - Cookie
+        - Content-Type
+      allow_credentials: true
+  admin:
+    base_url: "http://localhost:4434/"
+    port: 4434
+
+# ИСПРАВЛЕНО: Секреты должны быть массивами (списками)
+secrets:
+  cookie:
+    - "a_very_long_secret_for_cookie_signing"
+  cipher:
+    - "32_chars_secret_for_cipher_12345"
+
+selfservice:
+  default_browser_return_url: "http://localhost:4200/"
+  # ИСПРАВЛЕНО: whitelisted_return_urls находится в корне selfservice (проверьте отступы)
+  allowed_return_urls:
+    - http://localhost:4455/
+    - http://localhost:4455/welcome
+    - http://localhost:4455/dashboard
+
+  flows:
+    settings:
+      ui_url: "http://localhost:4455/settings"
+    recovery:
+      enabled: true
+      ui_url: "http://localhost:4455/recovery"
+    verification:
+      enabled: false
+      ui_url: "http://localhost:4455/verification"
+    login:
+      ui_url: "http://localhost:4455/login"
+    logout:
+      after:
+        default_browser_return_url: "http://localhost:4455/login"
+    registration:
+      ui_url: "http://localhost:4455/registration"
+      after:
+        password:
+          hooks:
+            - hook: session  # создает сессию после регистрации
+
+  # ИСПРАВЛЕНО: methods теперь находится внутри selfservice
+  methods:
+    password:
+      enabled: true
+      config:
+        haveibeenpwned_enabled: false
+    link:
+      enabled: true
+
+identity:
+  default_schema_id: default
+  schemas:
+    - id: "default"
+      # ИСПРАВЛЕНО: Путь к файлу должен быть в формате file://
+      url: "file:///etc/config/kratos/schemas/identity.schema.json"
+
+courier:
+  smtp:
+    connection_uri: "smtp://test:test@mailslurper:1025/?disable_starttls=true"
+    from_address: "no-reply@kratos.local"
+    from_name: "Kratos Auth"
+
+log:
+  level: info
+  format: text
