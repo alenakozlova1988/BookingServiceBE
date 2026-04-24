@@ -60,7 +60,17 @@ selfservice:
       after:
         password:
           hooks:
-            - hook: session  # создает сессию после регистрации
+            - hook: session
+            - hook: web_hook
+              config:
+                url: "http://host.docker.internal:5085/api/webhooks/generate-avatar"
+                method: POST
+                body: "file:///etc/config/kratos/webhooks/user_registration.jsonnet"
+                response:
+                  ignore: true
+                headers:
+                  Authorization: "Bearer dGhpcy1pcy1hLXNlY3JldC10b2tlbi0xMjM0NTY="
+                  Content-Type: "application/json"
 
   # ИСПРАВЛЕНО: methods теперь находится внутри selfservice
   methods:

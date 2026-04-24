@@ -88,6 +88,7 @@ builder.Services.AddScoped<IKratosService, KratosService>();
 builder.Services.AddScoped<IBookingService, BookingService.Application.Services.BookingService>();
 builder.Services.AddScoped<IRoomManagementService, RoomManagementService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddScoped<IGravatarService, GravatarService>();
 
 // AutoMapper Configuration
 builder.Services.AddAutoMapper(typeof(MappingConfiguration)); // Assuming your profile is named MappingConfiguration in Application layer

@@ -120,6 +120,9 @@ services:
         source: ./kratos/schemas/ # путь до identity схем
         target: /etc/config/kratos/schemas/
       - type: bind
+        source:  ./kratos/webhooks/
+        target: /etc/config/kratos/webhooks
+      - type: bind
         source: ./oidc
         target: /etc/oidc
     networks:

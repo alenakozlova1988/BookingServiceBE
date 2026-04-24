@@ -20,7 +20,8 @@
           }
         },
         "first_name": { "type": "string", "title": "First Name" },
-        "last_name": { "type": "string", "title": "Last Name" }
+        "last_name": { "type": "string", "title": "Last Name" },
+	"avatar_url": { "type": "string", "title": "Avatar URL" }
       },
       "required": ["email"],
       "additionalProperties": false
