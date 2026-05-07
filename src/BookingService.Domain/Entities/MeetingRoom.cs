@@ -19,6 +19,8 @@ public class MeetingRoom
     // Status of the room (e.g., "Available", "Occupied", "Maintenance")
     // Consider using an Enum for this (see below)
     public Status Status { get; set; } = Status.Available;
+    
+    public RoomColor Color { get; set; }
 
     // Navigation Property to Bookings
     public ICollection<Booking> Bookings { get; set;} = new List<Booking>();
@@ -31,4 +33,11 @@ public enum Status
     Occupied,
     Maintenance,
     OutOfService
+}
+
+public enum RoomColor
+{
+    Teal,
+    Blue,
+    Purple
 }

@@ -12,11 +12,13 @@ namespace BookingService.Application.Mapping
             // Mapping from Domain Entity to DTO
             CreateMap<Booking, BookingDto>()
                 .ForMember(dest => dest.DayIndex, opt => opt.MapFrom(src => (int)src.CheckInDate.DayOfWeek))
-                .ForMember(dest => dest.StartHourIndex, opt => opt.MapFrom(src =>   Math.Max(0, Math.Min(12, src.CheckInDate.Hour - 8))))
-                .ForMember(dest => dest.Duration, opt => opt.MapFrom(src => (src.CheckOutDate - src.CheckInDate ).TotalMinutes))
-                .ForMember(dest => dest.Color, opt => opt.MapFrom(src => ColorTheme.Purple))
+                .ForMember(dest => dest.StartHourIndex, opt => opt.MapFrom(src =>  src.CheckInDate.ToLocalTime().Hour - 8  /*Math.Max(0, Math.Min(12, src.CheckInDate.Hour - 8))*/))
+                .ForMember(dest => dest.Duration, opt => opt.MapFrom(src =>  (src.CheckOutDate - src.CheckInDate ).TotalHours))
+                .ForMember(dest => dest.Color, opt => opt.MapFrom(src => src.MeetingRoom.Color))
+                .ForMember(dest => dest.AuthorName, opt => opt.MapFrom(src => src.User.FirstName + " " + src.User.LastName))
                 .ForMember(dest => dest.RoomDescription, opt => opt.MapFrom(src => src.MeetingRoom.Description))
-                .ForMember(dest => dest.Title, opt => opt.MapFrom(src => src.User.FirstName))
+                .ForMember(dest => dest.RoomId, opt => opt.MapFrom(src => src.MeetingRoom.Id))
+                .ForMember(dest => dest.Title, opt => opt.MapFrom(src => src.Title))
                 .ForMember(dest => dest.Date, opt => opt.MapFrom(src => src.CheckInDate));// Map enum to string
                
             // Mapping from DTO to Domain Entity (for creation)
@@ -36,7 +38,7 @@ namespace BookingService.Application.Mapping
 
             CreateMap<MeetingRoom, MeetingRoomDto>()
               //  .ForMember(dest => dest.Id, opt => opt.Ignore())
-                .ForMember(dest => dest.Color, opt => opt.MapFrom(src => MeetingRoomColor.Teal))
+                .ForMember(dest => dest.Color, opt => opt.MapFrom(src => src.Color))
                 .ForMember(dest => dest.Description, opt => opt.MapFrom(src => src.Description))
                 .ForMember(dest => dest.Capacity, opt => opt.MapFrom(src => src.MaxOccupancy))
                 .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.Description));

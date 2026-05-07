@@ -4,31 +4,26 @@ using BookingService.Domain.Interfaces;
 using BookingService.Infrastructure.Integrations.RoomMgmt;
 //using BookingService.Infrastructure.Messaging;
 using Microsoft.EntityFrameworkCore;
-using AutoMapper;
-using BookingService.Application.Common.Interfaces;
+
+using BookingService.Api.Middleware;
 using BookingService.Application.Interfaces;
 using BookingService.Application.Mapping;
-using BookingService.Domain;
 using BookingService.Infrastructure;
 using BookingService.Infrastructure.Middlewares;
-using BookingService.Infrastructure.Persistence;
 using BookingService.Infrastructure.Persistence.Repositories;
 using BookingService.Infrastructure.Services;
 //using Serilog;
-using Microsoft.Extensions.Options; // For IOptions<T>
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using Prometheus;
+using Serilog; // For IOptions<T>
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Host.UseSerilog((context, configuration) => 
+    configuration.ReadFrom.Configuration(context.Configuration));
 // --- Configuration ---
 var configuration = builder.Configuration;
-
-// Configure Serilog
-//builder.Host.UseSerilog((context, configuration) =>
-  //  configuration.ReadFrom.Configuration(context.Configuration)
-   //              .Enrich.FromLogContext()
-    //             .WriteTo.Console()); // Log to console
-
-// --- Services ---
 
 // 1. Определяем имя политики
     var myAllowSpecificOrigins = "_myAllowSpecificOrigins";
@@ -41,7 +36,8 @@ var configuration = builder.Configuration;
             {
                 policy.WithOrigins("http://localhost:4200") // URL вашего Angular/Frontend приложения
                     .AllowAnyHeader()
-                    .AllowAnyMethod();
+                    .AllowAnyMethod()
+                    .AllowCredentials();
             });
     });
 
@@ -64,19 +60,11 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Infrastructure: Repositories
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 builder.Services.AddScoped<IRoomRepository, RoomRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IMeetingRoomService, MeetingRoomService>();
-
-
 
 // Add IUnitOfWork if you have implemented it
 // builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-
-// Infrastructure: Integrations
-// Configure HttpClient for external services
-//builder.Services.AddHttpClient<IRoomManagementService, RoomManagementService>(client =>
-//{
-   /// client.BaseAddress = new Uri(configuration["Services:RoomManagementServiceUrl"]);
-         //});
 
 // Infrastructure: Messaging (Example: Mock)
 // Replace with actual implementation (e.g., RabbitMQ client)
@@ -89,19 +77,29 @@ builder.Services.AddScoped<IBookingService, BookingService.Application.Services.
 builder.Services.AddScoped<IRoomManagementService, RoomManagementService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IGravatarService, GravatarService>();
+builder.Services.AddSingleton<BookingMetricsService>();
 
 // AutoMapper Configuration
 builder.Services.AddAutoMapper(typeof(MappingConfiguration)); // Assuming your profile is named MappingConfiguration in Application layer
 builder.Services.AddAutoMapper(typeof(MappingConfiguration).Assembly);
-// Add other services like Authentication, Authorization, Health Checks etc.
 
-// Option pattern for configuration
-// builder.Services.Configure<MyServiceOptions>(configuration.GetSection("MyServiceOptions"));
+// Add other services like Authentication, Authorization, Health Checks etc.
+builder.Services.AddAuthorization();
+
+// Prometheus метрики
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource
+        .AddService("BookingService.Api", serviceVersion: "1.0.0"))
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()  // Автоматические метрики ASP.NET
+        .AddHttpClientInstrumentation()  // Для внешних вызовов
+        .AddMeter("BookingService.*")    // Наши кастомные метрики
+        .AddPrometheusExporter());       // Экспорт в Prometheus
 
 var app = builder.Build();
 
-// --- Middleware Pipeline ---
 app.UseMiddleware<KratosSessionMiddleware>();
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -113,17 +111,17 @@ if (app.Environment.IsDevelopment())
     {
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         
-         dbContext.Database.EnsureCreated(); // Creates DB if not exists (no migrations)
+        dbContext.Database.EnsureCreated(); // Creates DB if not exists (no migrations)
         // OR Apply migrations:
-        try {
-             dbContext.Database.Migrate();
-             // Seed data here if needed
-             // AppDbContextSeed.SeedAsync(dbContext).Wait();
-        } catch (Exception ex)
+        try
         {
-            var kkk = ex;
-            //  Log.Error(ex, "Database migration failed during startup.");
-            // Decide how to handle this failure - maybe stop the app?
+            dbContext.Database.Migrate();
+            // Seed data here if needed
+            // AppDbContextSeed.SeedAsync(dbContext).Wait();
+        }
+        catch (Exception ex)
+        {
+              Log.Error(ex, "Database migration failed during startup. Error: {0}", ex.Message);
         }
     }
 }
@@ -133,8 +131,21 @@ app.UseHttpsRedirection();
 // 3. Подключаем CORS в конвейер обработки запросов. 
 // Важно: UseCors должен стоять ПЕРЕД UseAuthorization и ПЕРЕД MapControllers
 app.UseCors(myAllowSpecificOrigins);
-// Use Serilog Request Logging
-//app.UseSerilogRequestLogging();
+
+app.UseMetricServer(); 
+app.UseHttpMetrics();
+app.MapMetrics();
+
+// Кастомные метрики
+var requestCounter = Metrics.CreateCounter("app_requests_total", "Total requests");
+var activeRequests = Metrics.CreateGauge("app_requests_active", "Active requests");
+app.MapGet("/", () => {
+    Log.Information("HELLO ELK! My test message"); // Тестовый лог
+    return "Hello World";
+});
+
+app.UseOpenTelemetryPrometheusScrapingEndpoint();
+app.UseMetricsMiddleware();
 
 // Add Authentication and Authorization middleware if implemented
 // app.UseAuthentication();

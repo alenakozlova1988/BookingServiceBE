@@ -1,0 +1,47 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'logstash'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['logstash:9600']
+
+  - job_name: 'elasticsearch'
+    metrics_path: '/_prometheus/metrics'
+    static_configs:
+      - targets: ['elasticsearch:9200']
+
+  - job_name: 'kibana'
+    metrics_path: '/api/stats'
+    static_configs:
+      - targets: ['kibana:5601']
+
+  # API сервис
+  - job_name: 'booking_api'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['host.docker.internal:5085']
+        labels:
+          service: 'booking-api'
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'meter_(.*)'
+        target_label: '__name__'  # <-- ЭТОГО ПОЛЯ НЕ ХВАТАЛО
+        replacement: '${1}'
+        action: replace
+
+  # Worker сервис
+  - job_name: 'booking_worker'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['host.docker.internal:5086']
+        labels:
+          service: 'booking-worker'
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'meter_(.*)'
+        target_label: '__name__'  # <-- И ЗДЕСЬ ТОЖЕ
+        replacement: '${1}'
+        action: replace

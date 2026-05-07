@@ -1,0 +1,21 @@
+@model Booking.Service.Worker.EmailTemplateModel
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        .booking-details { border: 1px solid #ccc; padding: 10px; background: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <h2>Здравствуйте!</h2>
+    <p>Ваше бронирование создано:</p>
+    <div class="booking-details">
+        <strong>Переговорная комната:</strong> @Model.RoomName<br/>
+        <strong>Название встречи:</strong> @Model.EventName<br/>
+        <strong>Дата:</strong> @Model.Date<br/>
+    </div>
+    <p>С уважением, Booking Service</p>
+</body>
+</html>

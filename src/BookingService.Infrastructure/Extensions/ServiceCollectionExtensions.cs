@@ -1,6 +1,5 @@
 // Infrastructure/Extensions/ServiceCollectionExtensions.cs
 
-using BookingService.Application.Common.Interfaces;
 using BookingService.Application.Interfaces;
 using BookingService.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;

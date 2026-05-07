@@ -1,12 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using BookingService.Domain;
 using BookingService.Domain.Entities;
 using BookingService.Domain.Interfaces;
-using BookingService.Domain.Interfaces;
-using BookingService.Infrastructure.Persistence; // Import your DbContext
+ // Import your DbContext
 using Microsoft.EntityFrameworkCore;
 
 namespace BookingService.Infrastructure.Persistence.Repositories
@@ -44,15 +38,28 @@ namespace BookingService.Infrastructure.Persistence.Repositories
 
         public Task<Booking?> GetByIdAsync(Guid id)
         {
+            return _context.Bookings.FirstOrDefaultAsync(b => b.Id == id);
+        }
+
+        public Task<IEnumerable<Booking>> GetAllAsync()
+        {
             throw new NotImplementedException();
         }
 
-        public async Task<IEnumerable<Booking>> GetAllAsync()
+        public async Task<IEnumerable<Booking>> GetAllAsync(string? roomId = null)
         {
-            return await _context.Bookings
+            var result = _context.Bookings
                 .Include(x => x.User)
                 .Include(x => x.MeetingRoom)
-                .Where(x => x.Status != BookingStatus.NoShow).ToListAsync();
+                .Where(x => x.Status != BookingStatus.NoShow && x.Status != BookingStatus.Cancelled);
+
+            if (roomId != null)
+            {
+                var roomGuid = Guid.Parse(roomId);
+                result = result.Where(x => x.MeetingRoomId == roomGuid);
+            }
+
+            return await result.ToListAsync();
         }
 
         public Task<IEnumerable<Booking>> GetByUserIdAsync(Guid userId)
@@ -60,14 +67,17 @@ namespace BookingService.Infrastructure.Persistence.Repositories
             throw new NotImplementedException();
         }
 
-        public void Update(Booking booking)
+        public void Update(Booking entity)
         {
-            throw new NotImplementedException();
+            _context.Bookings.Update(entity);
+            _context.SaveChangesAsync();
         }
 
         public void Delete(Booking booking)
         {
-            throw new NotImplementedException();
+            booking.Status = BookingStatus.Cancelled;
+            _context.Bookings.Update(booking);
+            _context.SaveChangesAsync();
         }
 
         public async Task SaveChangesAsync()
@@ -75,19 +85,39 @@ namespace BookingService.Infrastructure.Persistence.Repositories
             await _context.SaveChangesAsync();
         }
 
-        public async Task<Guid> AddAsync(Booking booking)
+        public async Task<bool> IsBookingOverlapsForRoom(Booking booking, DateTime startDate, DateTime endDate)
         {
-            if (booking == null) throw new ArgumentNullException(nameof(booking));
-
-            // For added safety, generate ID if not already set (though it's default)
-            if (booking.Id == Guid.Empty)
+            try
             {
-                booking.Id = Guid.NewGuid();
+                return await _context.Bookings.AnyAsync(b =>
+                    b.Id != booking.Id && // Исключаем само текущее бронирование
+                    b.MeetingRoomId == booking.MeetingRoomId && // Проверяем то же самое бронирование
+                    (
+                        (b.CheckInDate < endDate.ToUniversalTime()) && (b.CheckOutDate > startDate.ToUniversalTime())
+                    )
+                );
+            }
+            catch (Exception ex)
+            {
+                var ed = ex.Message;
             }
 
-            await _context.Bookings.AddAsync(booking);
+            return false;
+        }
+
+        public async Task<Guid> AddAsync(Booking entity)
+        {
+            if (entity == null) throw new ArgumentNullException(nameof(entity));
+
+            // For added safety, generate ID if not already set (though it's default)
+            if (entity.Id == Guid.Empty)
+            {
+                entity.Id = Guid.NewGuid();
+            }
+
+            await _context.Bookings.AddAsync(entity);
             await _context.SaveChangesAsync(); // Save changes to persist the booking to the DB
-            return booking.Id; // Return the booking with its ID assigned
+            return entity.Id; // Return the booking with its ID assigned
         }
 
         public async Task UpdateAsync(Booking booking)

@@ -27,12 +27,12 @@ public class RoomRepository : IRoomRepository
         throw new NotImplementedException();
     }
 
-    public Task<Guid> AddAsync(MeetingRoom booking)
+    public Task<Guid> AddAsync(MeetingRoom entity)
     {
         throw new NotImplementedException();
     }
 
-    public void Update(MeetingRoom booking)
+    public void Update(MeetingRoom entity)
     {
         throw new NotImplementedException();
     }

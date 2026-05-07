@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
-using BookingService.Application.Common.Interfaces;
 using BookingService.Application.Interfaces;
+using BookingService.Infrastructure.Services;
 
 namespace BookingService.Web.Controllers;
 

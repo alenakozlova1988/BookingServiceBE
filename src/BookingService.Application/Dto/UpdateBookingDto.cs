@@ -5,24 +5,36 @@ namespace BookingService.Application.Dto
 {
     public class UpdateBookingDto
     {
-        // Note: We might not allow changing RoomId after creation, or it might be a complex operation.
-        // Let's assume for this example we can update dates and guest info.
+        /// <summary>
+        /// Дата бронирования в формате ISO 8601 (например, "2026-03-31T16:11:19.461Z").
+        /// Используем DateTimeOffset для корректной обработки UTC времени.
+        /// </summary>
+        [Required(ErrorMessage = "Дата является обязательным полем")]
+        public DateTimeOffset Date { get; set; }
 
-        [Required]
-        public DateTime StartDate { get; set; }
+        /// <summary>
+        /// Идентификатор выбранной переговорной комнаты.
+        /// </summary>
+        [Required(ErrorMessage = "Необходимо указать название комнаты")]
+        [StringLength(100, MinimumLength = 2)]
+        public string RoomId { get; set; }
 
-        [Required]
-        public DateTime EndDate { get; set; }
+        /// <summary>
+        /// Название или заголовок встречи.
+        /// </summary>
+        [Required(ErrorMessage = "Заголовок встречи обязателен")]
+        public string Title { get; set; } = string.Empty;
 
-        [Required]
-        [StringLength(100, ErrorMessage = "Guest name cannot be longer than 100 characters.")]
-        public string GuestName { get; set; }
+        /// <summary>
+        /// Индекс часа начала встречи (например: 0 для 08:00, 1 для 09:00 и т.д.).
+        /// </summary>
+        [Range(0, 24, ErrorMessage = "Индекс начала часа должен быть в пределах суток")]
+        public int StartHourIndex { get; set; }
 
-        [EmailAddress]
-        [StringLength(255)]
-        public string GuestEmail { get; set; }
-
-        // Optional: Consider how to handle status updates. Maybe a separate endpoint or specific DTO for cancellation.
-        // public string Status { get; set; }
+        /// <summary>
+        /// Продолжительность бронирования в часах.
+        /// </summary>
+        [Range(1, 12, ErrorMessage = "Продолжительность должна быть от 1 до 12 часов")]
+        public int Duration { get; set; }
     }
 }

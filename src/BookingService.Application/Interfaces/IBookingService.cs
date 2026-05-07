@@ -6,11 +6,10 @@ namespace BookingService.Application.Services
     {
         Task<BookingDto> CreateBookingAsync(CreateBookingDto bookingDto);
         
-        Task<IEnumerable<BookingDto>> GetAllBookingsAsync();
+        Task<IEnumerable<BookingDto>> GetAllBookingsAsync(string? roomId = null);
         Task<BookingDto?> GetBookingByIdAsync(Guid id);
         Task<IEnumerable<BookingDto>> GetBookingsByUserIdAsync(Guid userId);
         Task<bool> CancelBookingAsync(Guid bookingId);
-        Task<BookingDto> UpdateBookingAsync(Guid bookingId, UpdateBookingDto bookingDto);
-        // ... other methods
+        Task<BookingDto> UpdateBookingAsync(Guid bookingId, CreateBookingDto bookingDto);
     }
 }

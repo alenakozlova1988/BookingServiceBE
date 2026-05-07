@@ -1,0 +1,20 @@
+# Этот файл должен быть в директории ./grafana/provisioning/datasources/
+# Название файла может быть любым, например, prometheus.yml или myapp.yml
+
+apiVersion: 1 # Обязательная версия API
+
+# Это именно LIST (список) источников данных
+datasources:
+  # Первый (и в данном случае единственный) источник данных
+  - name: Prometheus # Имя, которое будет видно в Grafana
+    type: prometheus # Тип источника данных
+    access: proxy # Grafana будет делать запросы к Prometheus от своего имени
+    url: http://prometheus:9090 # URL Prometheus в Docker Compose сети.
+    # 'prometheus' = имя сервиса из docker-compose.yml
+    isDefault: true # Если установить в true, Grafana будет использовать этот источник данных по умолчанию
+    jsonData:
+      timeInterval: "$__interval"
+    # secureJsonData: # Раскомментируйте, если Prometheus требует аутентификации
+    #   basicAuthPassword: "your_prometheus_password"
+    # basicAuthUser: "your_prometheus_user"
+

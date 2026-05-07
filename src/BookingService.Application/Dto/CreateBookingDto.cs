@@ -10,7 +10,7 @@ namespace BookingService.Application.Dto
         /// Используем DateTimeOffset для корректной обработки UTC времени.
         /// </summary>
         [Required(ErrorMessage = "Дата является обязательным полем")]
-        public DateTimeOffset Date { get; set; }
+        public DateTime Date { get; set; }
 
         /// <summary>
         /// Название выбранной переговорной комнаты.

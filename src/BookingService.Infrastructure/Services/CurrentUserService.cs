@@ -1,6 +1,3 @@
-using BookingService.Application.Common.Interfaces;
-
-// Infrastructure/Services/CurrentUserService.cs
 using Microsoft.AspNetCore.Http;
 
 namespace BookingService.Infrastructure.Services;

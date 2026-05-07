@@ -34,7 +34,6 @@ namespace MeetingRoomBooking.Controllers
         {
             try
             {
-                // Получаем все комнаты из базы данных асинхронно
                 var rooms = await _meetingRoomService.GetAllMeetingRoomsAsync();
 
                 return Ok(rooms); // Возвращаем статус 200 OK и список данных

@@ -1,8 +1,4 @@
-// Core/Application/Common/Interfaces/ICurrentUserService.cs
-
-using BookingService.Application.Models.Kratos;
-
-namespace BookingService.Application.Common.Interfaces;
+namespace BookingService.Infrastructure.Services;
 
 public interface ICurrentUserService
 {
